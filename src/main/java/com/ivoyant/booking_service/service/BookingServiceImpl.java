@@ -26,14 +26,14 @@ public class BookingServiceImpl implements BookingService {
     public Booking createBooking(Booking booking) {
         log.info("Starting booking for vehicle ID: {}", booking.getVehicleId());
 
-        // 1️⃣ Check vehicle
+        // 1️ Check vehicle
         String vehicleUrl = "http://localhost:8081/vehicles/" + booking.getVehicleId();
         Object vehicle = restTemplate.getForObject(vehicleUrl, Object.class);
         if (vehicle == null) {
             throw new RuntimeException("Vehicle not found!");
         }
 
-        // 2️⃣ Allocate slot from Workshop Service
+        // 2️ Allocate slot from Workshop Service
         String slotUrl = "http://localhost:8082/workshop/slots";
         Object[] slots = restTemplate.getForObject(slotUrl, Object[].class);
         if (slots == null || slots.length == 0) {
@@ -44,15 +44,15 @@ public class BookingServiceImpl implements BookingService {
         Long allocatedSlotId = Long.parseLong(slot.get("id").toString());
         booking.setSlotId(allocatedSlotId);
 
-        // 3️⃣ Set initial details
+        // 3️ Set initial details
         booking.setBookingDate(LocalDateTime.now());
         booking.setStatus("PENDING");
 
-        // 4️⃣ Save booking
+        // 4️ Save booking
         Booking savedBooking = bookingRepository.save(booking);
         log.info("Booking saved with ID: {}", savedBooking.getId());
 
-        // 5️⃣ Process payment
+        // 5️ Process payment
         PaymentRequest paymentRequest = new PaymentRequest();
         paymentRequest.setBookingId(savedBooking.getId());
         paymentRequest.setAmount(savedBooking.getAmount());
@@ -63,14 +63,14 @@ public class BookingServiceImpl implements BookingService {
                 PaymentResponse.class
         );
 
-        // 6️⃣ Update booking after successful payment
+        // 6️ Update booking after successful payment
         if (paymentResponse != null && "SUCCESS".equals(paymentResponse.getStatus())) {
             savedBooking.setStatus("CONFIRMED");
             savedBooking.setPaymentId(paymentResponse.getId());
             log.info("Payment processed successfully with ID: {}", paymentResponse.getId());
         }
 
-        // 7️⃣ Save final state
+        // 7️ Save final state
         return bookingRepository.save(savedBooking);
     }
 
