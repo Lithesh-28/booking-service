@@ -7,6 +7,7 @@ import com.ivoyant.booking_service.exception.BookingNotFoundException;
 import com.ivoyant.booking_service.repository.BookingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -22,58 +23,65 @@ public class BookingServiceImpl implements BookingService {
     private final BookingRepository bookingRepository;
     private final RestTemplate restTemplate;
 
+    @Value("${booking-service.vehicle-service-name}")
+    private String vehicleServiceName;
+
+    @Value("${booking-service.workshop-service-name}")
+    private String workshopServiceName;
+
+    @Value("${booking-service.payment-service-name}")
+    private String paymentServiceName;
+
     @Override
     public Booking createBooking(Booking booking) {
         log.info("Starting booking for vehicle ID: {}", booking.getVehicleId());
 
-        // 1️ Check vehicle
-        String vehicleUrl = "http://localhost:8081/vehicles/" + booking.getVehicleId();
+        // Check vehicle via Vehicle Service
+        String vehicleUrl = "http://" + vehicleServiceName + "/vehicles/" + booking.getVehicleId();
         Object vehicle = restTemplate.getForObject(vehicleUrl, Object.class);
         if (vehicle == null) {
             throw new RuntimeException("Vehicle not found!");
         }
+        log.info("Vehicle exists: {}", booking.getVehicleId());
 
-        // 2️ Allocate slot from Workshop Service
-        String slotUrl = "http://localhost:8082/workshop/slots";
+        // Allocate slot from Workshop Service
+        String slotUrl = "http://" + workshopServiceName + "/workshop/slots";
         Object[] slots = restTemplate.getForObject(slotUrl, Object[].class);
         if (slots == null || slots.length == 0) {
             throw new RuntimeException("No available slots!");
         }
 
-        Map<String, Object> slot = (Map<String, Object>) slots[0];
+        Map<String, Object> slot = (Map<String, Object>) slots[0]; // pick first slot
         Long allocatedSlotId = Long.parseLong(slot.get("id").toString());
         booking.setSlotId(allocatedSlotId);
+        log.info("Slot allocated: {}", allocatedSlotId);
 
-        // 3️ Set initial details
+        // Set initial booking details
         booking.setBookingDate(LocalDateTime.now());
         booking.setStatus("PENDING");
 
-        // 4️ Save booking
+        // Save booking to get an ID
         Booking savedBooking = bookingRepository.save(booking);
         log.info("Booking saved with ID: {}", savedBooking.getId());
 
-        // 5️ Process payment
+        // Process payment via Payment Service
         PaymentRequest paymentRequest = new PaymentRequest();
         paymentRequest.setBookingId(savedBooking.getId());
         paymentRequest.setAmount(savedBooking.getAmount());
 
-        PaymentResponse paymentResponse = restTemplate.postForObject(
-                "http://localhost:8083/payments",
-                paymentRequest,
-                PaymentResponse.class
-        );
+        String paymentUrl = "http://" + paymentServiceName + "/payments";
+        PaymentResponse paymentResponse = restTemplate.postForObject(paymentUrl, paymentRequest, PaymentResponse.class);
 
-        // 6️ Update booking after successful payment
+        // Update booking after successful payment
         if (paymentResponse != null && "SUCCESS".equals(paymentResponse.getStatus())) {
             savedBooking.setStatus("CONFIRMED");
             savedBooking.setPaymentId(paymentResponse.getId());
             log.info("Payment processed successfully with ID: {}", paymentResponse.getId());
         }
 
-        // 7️ Save final state
+        // Save final state
         return bookingRepository.save(savedBooking);
     }
-
 
     @Override
     public Booking getBookingById(Long id) {
@@ -103,4 +111,3 @@ public class BookingServiceImpl implements BookingService {
         bookingRepository.delete(booking);
     }
 }
-
