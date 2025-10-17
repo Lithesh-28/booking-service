@@ -4,6 +4,8 @@ import com.ivoyant.booking_service.dto.PaymentRequest;
 import com.ivoyant.booking_service.dto.PaymentResponse;
 import com.ivoyant.booking_service.entity.Booking;
 import com.ivoyant.booking_service.exception.BookingNotFoundException;
+import com.ivoyant.booking_service.exception.SlotNotFoundException;
+import com.ivoyant.booking_service.exception.VehicleNotFoundException;
 import com.ivoyant.booking_service.repository.BookingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +42,7 @@ public class BookingServiceImpl implements BookingService {
         String vehicleUrl = "http://" + vehicleServiceName + "/vehicles/" + booking.getVehicleId();
         Object vehicle = restTemplate.getForObject(vehicleUrl, Object.class);
         if (vehicle == null) {
-            throw new RuntimeException("Vehicle not found!");
+            throw new VehicleNotFoundException("Vehicle not found for the specified vehicle id!");
         }
         log.info("Vehicle exists: {}", booking.getVehicleId());
 
@@ -48,7 +50,7 @@ public class BookingServiceImpl implements BookingService {
         String slotUrl = "http://" + workshopServiceName + "/workshop/slots";
         Object[] slots = restTemplate.getForObject(slotUrl, Object[].class);
         if (slots == null || slots.length == 0) {
-            throw new RuntimeException("No available slots!");
+            throw new SlotNotFoundException("No available slots Currently choose different time!");
         }
 
         Map<String, Object> slot = (Map<String, Object>) slots[0]; // pick first slot
