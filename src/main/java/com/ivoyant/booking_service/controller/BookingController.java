@@ -2,6 +2,7 @@ package com.ivoyant.booking_service.controller;
 
 import com.ivoyant.booking_service.entity.Booking;
 import com.ivoyant.booking_service.service.BookingService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +19,7 @@ public class BookingController {
     private final BookingService bookingService;
 
     @PostMapping
-    public ResponseEntity<Booking> createBooking(@RequestBody Booking booking) {
+    public ResponseEntity<Booking> createBooking(@Valid @RequestBody Booking booking) {
         log.info("Received create booking request");
         return ResponseEntity.ok(bookingService.createBooking(booking));
     }
